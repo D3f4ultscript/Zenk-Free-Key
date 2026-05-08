@@ -134,11 +134,13 @@
                     authToken = pass;
                     sessionStorage.setItem('admin_token', pass);
                     showAdmin();
+                } else if (data.error) {
+                    document.getElementById('login-error').innerText = "Setup Error: " + data.error;
                 } else {
                     document.getElementById('login-error').innerText = "Access Denied: Invalid Password";
                 }
             } catch(e) {
-                document.getElementById('login-error').innerText = "Connection Error";
+                document.getElementById('login-error').innerText = "Network Error: " + e.message + " - Check if KV Namespace is bound in Cloudflare Dashboard";
             }
         };
 
