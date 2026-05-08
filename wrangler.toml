@@ -1,10 +1,6 @@
-# name = "key-website"
-# pages_build_output_dir = "./public"
-# compatibility_date = "2023-12-01"
-
-# [[kv_namespaces]]
-# binding = "KEYS_KV"
-# id = "YOUR_KV_NAMESPACE_ID_HERE"
+name = "key-website"
+pages_build_output_dir = "./public"
+compatibility_date = "2023-12-01"
 
 [vars]
 # AD_PASS sollte in der Cloudflare-Dashboard-Oberfläche als "Secret" gesetzt werden.
