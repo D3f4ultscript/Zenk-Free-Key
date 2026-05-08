@@ -5,41 +5,47 @@ export async function onRequest(context) {
 
   // API Route: Get a key
   if (path === "/api/get-key" && request.method === "GET") {
-    const keys = await env.KEYS_KV.list({ prefix: "key:" });
-    const unclaimed = [];
-    for (const item of keys.keys) {
-      const val = await env.KEYS_KV.get(item.name, { type: "json" });
-      if (val && !val.claimed) {
-        unclaimed.push({ name: item.name, data: val });
+    try {
+      if (!env.KEYS_KV) throw new Error("KV Namespace 'KEYS_KV' not bound in Dashboard");
+      
+      const keys = await env.KEYS_KV.list({ prefix: "key:" });
+      const unclaimed = [];
+      for (const item of keys.keys) {
+        const val = await env.KEYS_KV.get(item.name, { type: "json" });
+        if (val && !val.claimed) {
+          unclaimed.push({ name: item.name, data: val });
+        }
       }
-    }
 
-    if (unclaimed.length === 0) {
-      return new Response(JSON.stringify({ error: "No keys left" }), { 
-        status: 404,
+      if (unclaimed.length === 0) {
+        return new Response(JSON.stringify({ error: "No keys left" }), { 
+          status: 404,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      const selected = unclaimed[Math.floor(Math.random() * unclaimed.length)];
+      const updatedData = {
+        ...selected.data,
+        claimed: true,
+        claimedAt: Date.now()
+      };
+
+      // Set expiration relative to CURRENT time (must be at least 60s in future for KV)
+      let expiration = undefined;
+      if (updatedData.expiryString) {
+        const seconds = parseExpiry(updatedData.expiryString);
+        if (seconds) expiration = Math.floor(Date.now() / 1000) + seconds;
+      }
+
+      await env.KEYS_KV.put(selected.name, JSON.stringify(updatedData), { expiration });
+      
+      return new Response(JSON.stringify({ key: selected.data.key }), {
         headers: { "Content-Type": "application/json" }
       });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: e.message }), { status: 500 });
     }
-
-    const selected = unclaimed[Math.floor(Math.random() * unclaimed.length)];
-    const updatedData = {
-      ...selected.data,
-      claimed: true,
-      claimedAt: Date.now()
-    };
-
-    // Set expiration relative to CURRENT time (must be at least 60s in future for KV)
-    let expiration = undefined;
-    if (updatedData.expiryString) {
-      const seconds = parseExpiry(updatedData.expiryString);
-      if (seconds) expiration = Math.floor(Date.now() / 1000) + seconds;
-    }
-
-    await env.KEYS_KV.put(selected.name, JSON.stringify(updatedData), { expiration });
-    
-    return new Response(JSON.stringify({ key: selected.data.key }), {
-      headers: { "Content-Type": "application/json" }
-    });
   }
 
   // API Route: Verify Admin
