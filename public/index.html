@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free Key Generator</title>
+    <style>
+        body {
+            background-color: #000;
+            color: #ff0000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        .container {
+            text-align: center;
+            border: 2px solid #ff0000;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px #ff0000;
+            background-color: #1a1a1a;
+            max-width: 400px;
+            width: 90%;
+        }
+        h1 { margin-bottom: 30px; text-transform: uppercase; letter-spacing: 2px; }
+        button {
+            background-color: #ff0000;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-transform: uppercase;
+        }
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px #ff0000;
+        }
+        button:active { transform: scale(0.95); }
+        
+        /* Anti-Bot Test Styles */
+        #captcha-container {
+            display: none;
+            margin-top: 20px;
+        }
+        .emoji-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .emoji-btn {
+            font-size: 30px;
+            background: #2a2a2a;
+            border: 1px solid #ff0000;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .emoji-btn:hover { background: #3a3a3a; }
+        
+        /* Key View */
+        #key-display {
+            display: none;
+            margin-top: 20px;
+        }
+        #key-input {
+            background: #000;
+            color: #ff0000;
+            border: 1px solid #ff0000;
+            padding: 10px;
+            width: 80%;
+            text-align: center;
+            font-family: monospace;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        .message { margin-top: 15px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="main-view">
+            <h1>Get Your Free Key</h1>
+            <button id="get-key-btn">Free Key</button>
+        </div>
+
+        <div id="captcha-container">
+            <h3>Anti-Bot Test</h3>
+            <p id="captcha-instruction">Klicke auf alle Buttons mit diesem Emoji: <span id="target-emoji"></span></p>
+            <div class="emoji-grid" id="emoji-grid"></div>
+            <p id="captcha-status" class="message"></p>
+        </div>
+
+        <div id="key-display">
+            <h3>Your Key:</h3>
+            <input type="text" id="key-input" readonly>
+            <br>
+            <button id="copy-btn">Copy Key</button>
+            <p id="copy-status" class="message"></p>
+        </div>
+    </div>
+
+    <script>
+        const mainView = document.getElementById('main-view');
+        const captchaContainer = document.getElementById('captcha-container');
+        const keyDisplay = document.getElementById('key-display');
+        const emojiGrid = document.getElementById('emoji-grid');
+        const targetEmojiSpan = document.getElementById('target-emoji');
+        const captchaStatus = document.getElementById('captcha-status');
+        const keyInput = document.getElementById('key-input');
+        
+        let clicksNeeded = 0;
+        let clicksDone = 0;
+
+        document.getElementById('get-key-btn').onclick = () => {
+            mainView.style.display = 'none';
+            captchaContainer.style.display = 'block';
+            startCaptcha();
+        };
+
+        function startCaptcha() {
+            const emojis = ['🍎', '🍌', '🍒', '🍇', '🍉', '🍍', '🥝', '🍓', '🥑'];
+            const target = emojis[Math.floor(Math.random() * emojis.length)];
+            targetEmojiSpan.innerText = target;
+            
+            emojiGrid.innerHTML = '';
+            clicksNeeded = 0;
+            clicksDone = 0;
+
+            const pool = [];
+            // Mix target emojis and others
+            for(let i=0; i<9; i++) {
+                const isTarget = Math.random() > 0.6;
+                const emoji = isTarget ? target : emojis[Math.floor(Math.random() * emojis.length)];
+                if (emoji === target) clicksNeeded++;
+                pool.push({ emoji, isTarget: emoji === target });
+            }
+
+            // Ensure at least one target exists
+            if (clicksNeeded === 0) {
+                pool[0] = { emoji: target, isTarget: true };
+                clicksNeeded = 1;
+            }
+
+            pool.forEach(item => {
+                const btn = document.createElement('button');
+                btn.className = 'emoji-btn';
+                btn.innerText = item.emoji;
+                btn.onclick = () => {
+                    if (item.isTarget) {
+                        btn.style.borderColor = '#00ff00';
+                        btn.disabled = true;
+                        clicksDone++;
+                        if (clicksDone === clicksNeeded) {
+                            fetchKey();
+                        }
+                    } else {
+                        captchaStatus.innerText = 'Falsch! Versuche es erneut.';
+                        setTimeout(startCaptcha, 1000);
+                    }
+                };
+                emojiGrid.appendChild(btn);
+            });
+        }
+
+        async function fetchKey() {
+            captchaContainer.style.display = 'none';
+            keyDisplay.style.display = 'block';
+            
+            try {
+                const res = await fetch('/api/get-key');
+                const data = await res.json();
+                if (data.key) {
+                    keyInput.value = data.key;
+                } else {
+                    keyInput.value = "KEINE KEYS VERFÜGBAR";
+                }
+            } catch (e) {
+                keyInput.value = "FEHLER BEIM LADEN";
+            }
+        }
+
+        document.getElementById('copy-btn').onclick = () => {
+            keyInput.select();
+            document.execCommand('copy');
+            document.getElementById('copy-status').innerText = 'Copied!';
+        };
+    </script>
+</body>
+</html>

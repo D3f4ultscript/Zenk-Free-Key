@@ -1,0 +1,15 @@
+name = "key-website"
+main = "index.js"
+compatibility_date = "2023-12-01"
+
+[site]
+bucket = "./public"
+
+[[kv_namespaces]]
+binding = "KEYS_KV"
+id = "YOUR_KV_NAMESPACE_ID_HERE"
+
+[vars]
+# AD_PASS sollte in der Cloudflare-Dashboard-Oberfläche als "Secret" gesetzt werden.
+# Hier nur als Platzhalter oder für lokale Entwicklung:
+# AD_PASS = "dein_passwort"

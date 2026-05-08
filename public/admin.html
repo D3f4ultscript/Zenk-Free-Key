@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <style>
+        body { background-color: #000; color: #ff0000; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .login-container, .admin-container { border: 2px solid #ff0000; padding: 30px; border-radius: 10px; background: #111; box-shadow: 0 0 15px #ff0000; width: 100%; max-width: 800px; }
+        .hidden { display: none; }
+        h1, h2 { text-transform: uppercase; text-align: center; }
+        input, select, button { padding: 10px; margin: 10px 0; border: 1px solid #ff0000; background: #000; color: #ff0000; border-radius: 5px; }
+        button { cursor: pointer; font-weight: bold; text-transform: uppercase; }
+        button:hover { background: #ff0000; color: #000; }
+        
+        .stats { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .stat-box { border: 1px solid #ff0000; padding: 15px; flex: 1; margin: 0 5px; text-align: center; background: #1a1a1a; }
+        .search-bar { width: 100%; box-sizing: border-box; }
+        .key-list { margin-top: 20px; max-height: 400px; overflow-y: auto; border: 1px solid #ff0000; padding: 10px; }
+        .key-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #333; }
+        .key-item:last-child { border-bottom: none; }
+        .claimed { color: #888; text-decoration: line-through; }
+        .timestamp { font-size: 0.8em; color: #ff5555; }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; }
+        
+        #popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #111; border: 2px solid #ff0000; padding: 20px; z-index: 100; box-shadow: 0 0 50px #000; }
+    </style>
+</head>
+<body>
+    <div id="login-view" class="login-container">
+        <h1>Admin Access</h1>
+        <input type="password" id="admin-pass" placeholder="Password (AD_PASS)" style="width: 100%; box-sizing: border-box;">
+        <button id="verify-btn" style="width: 100%;">Verify</button>
+        <p id="login-error" style="color: red; text-align: center;"></p>
+    </div>
+
+    <div id="admin-view" class="admin-container hidden">
+        <h2>Dashboard</h2>
+        <div class="stats">
+            <div class="stat-box">Total Keys<br><span id="total-keys">0</span></div>
+            <div class="stat-box">Claimed<br><span id="claimed-keys">0</span></div>
+            <div class="stat-box">Last 24h<br><span id="last-24h">0</span></div>
+        </div>
+
+        <div class="controls">
+            <button id="add-keys-btn">Add New Keys (TXT)</button>
+            <button id="delete-all-btn" style="border-color: #880000; color: #880000;">Delete All Keys</button>
+        </div>
+
+        <input type="text" id="search-bar" class="search-bar" placeholder="Search keys...">
+        
+        <div class="key-list" id="key-list">
+            <!-- Keys will be listed here -->
+        </div>
+    </div>
+
+    <div id="popup" class="hidden">
+        <h3>Deletion Timer</h3>
+        <p>In wie vielen Tagen/Stunden sollen geclaimte Keys gelöscht werden?</p>
+        <input type="text" id="expiry-input" placeholder="e.g. 25h, 2d, 30m, 10s">
+        <button id="confirm-upload">Start Upload</button>
+        <button id="cancel-upload">Abbrechen</button>
+    </div>
+
+    <input type="file" id="file-input" class="hidden" accept=".txt">
+
+    <script>
+        let authToken = "";
+        let pendingFileContent = "";
+
+        const loginView = document.getElementById('login-view');
+        const adminView = document.getElementById('admin-view');
+        const popup = document.getElementById('popup');
+        const fileInput = document.getElementById('file-input');
+
+        document.getElementById('verify-btn').onclick = async () => {
+            const pass = document.getElementById('admin-pass').value;
+            const res = await fetch('/api/admin/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pass })
+            });
+            const data = await res.json();
+            if (data.success) {
+                authToken = pass;
+                loginView.classList.add('hidden');
+                adminView.classList.remove('hidden');
+                loadDashboard();
+            } else {
+                document.getElementById('login-error').innerText = "Wrong password!";
+            }
+        };
+
+        async function loadDashboard() {
+            const res = await fetch('/api/admin/keys', {
+                headers: { 'Authorization': authToken }
+            });
+            const data = await res.json();
+            
+            document.getElementById('total-keys').innerText = data.total;
+            document.getElementById('claimed-keys').innerText = data.claimed;
+            document.getElementById('last-24h').innerText = data.last24h;
+            
+            renderKeys(data.keys);
+        }
+
+        function renderKeys(keys) {
+            const list = document.getElementById('key-list');
+            const search = document.getElementById('search-bar').value.toLowerCase();
+            list.innerHTML = '';
+            
+            keys.filter(k => k.key.toLowerCase().includes(search)).forEach(k => {
+                const div = document.createElement('div');
+                div.className = 'key-item';
+                if (k.claimed) div.classList.add('claimed');
+                
+                div.innerHTML = `
+                    <span>${k.key}</span>
+                    <span class="timestamp">${k.claimedAt ? new Date(k.claimedAt).toLocaleString() : 'Not claimed'}</span>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        document.getElementById('search-bar').oninput = () => {
+            // Need to store keys globally to re-filter
+            fetchAndRender();
+        };
+
+        async function fetchAndRender() {
+            const res = await fetch('/api/admin/keys', {
+                headers: { 'Authorization': authToken }
+            });
+            const data = await res.json();
+            renderKeys(data.keys);
+        }
+
+        document.getElementById('delete-all-btn').onclick = async () => {
+            if (confirm("Wirklich ALLE Keys löschen?")) {
+                await fetch('/api/admin/keys/delete-all', {
+                    method: 'POST',
+                    headers: { 'Authorization': authToken }
+                });
+                loadDashboard();
+            }
+        };
+
+        document.getElementById('add-keys-btn').onclick = () => fileInput.click();
+
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (re) => {
+                pendingFileContent = re.target.result;
+                popup.classList.remove('hidden');
+            };
+            reader.readAsText(file);
+        };
+
+        document.getElementById('confirm-upload').onclick = async () => {
+            const expiry = document.getElementById('expiry-input').value;
+            const res = await fetch('/api/admin/keys/add', {
+                method: 'POST',
+                headers: { 
+                    'Authorization': authToken,
+                    'Content-Type': 'application/json' 
+                },
+                body: JSON.stringify({ content: pendingFileContent, expiry })
+            });
+            popup.classList.add('hidden');
+            loadDashboard();
+        };
+
+        document.getElementById('cancel-upload').onclick = () => {
+            popup.classList.add('hidden');
+            pendingFileContent = "";
+        };
+    </script>
+</body>
+</html>

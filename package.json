@@ -1,0 +1,13 @@
+{
+  "name": "key-website",
+  "version": "1.0.0",
+  "description": "A simple key distribution website with anti-bot test and admin panel",
+  "main": "index.js",
+  "scripts": {
+    "start": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
